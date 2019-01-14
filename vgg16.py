@@ -20,17 +20,18 @@ class Vgg16:
         self.dropout = dropout
         print("npy file loaded")
 
-    def build(self, rgb, train_mode=None):
+    def build(self, rgb, gt , lr ,train_mode=None):
         """
         load variable from npy to build the VGG
 
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
+        :param gt: gt groudtruth [batch, numclasses] values scaled 0 or 1
         """
 
         start_time = time.time()
         print("build model started")
         rgb_scaled = rgb * 255.0
-
+        
         # Convert RGB to BGR
         red, green, blue = tf.split(axis=3, num_or_size_splits=3, value=rgb_scaled)
         assert red.get_shape().as_list()[1:] == [224, 224, 1]
@@ -102,6 +103,7 @@ class Vgg16:
         self.prob = tf.nn.softmax(self.fc9, name="prob")
 
         self.data_dict = None
+        self.train = self.run(gt,lr)
         print(("build model finished: %ds" % (time.time() - start_time)))
 
     def avg_pool(self, bottom, name):
@@ -183,6 +185,20 @@ class Vgg16:
 
         return weights, biases
     
+    def run(self,gt,lr):
+        self.loss = tf.reduce_sum((self.prob - gt )**2,name = 'loss')
+        train = tf.train.GradientDescentOptimizer(lr).minimize(self.loss)
+
+        #self.loss = tf.reduce_mean(-tf.reduce_sum(gt*tf.log(self.prob)))
+        #train = tf.train.AdamOptimizer(lr).minimize(self.loss)
+
+        correct_prediction = tf.equal(tf.arg_max(self.prob,1),tf.arg_max(gt,1))
+        self.acc = tf.reduce_mean(tf.cast(correct_prediction,tf.float32),name = 'acc')
+
+        return train
+
+    
+
     #删掉这个函数
     #def get_conv_filter(self, name):
     #    return tf.constant(self.data_dict[name][0], name="filter")

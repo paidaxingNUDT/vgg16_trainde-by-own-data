@@ -3,29 +3,37 @@ import tensorflow as tf
 
 import vgg16
 import utils
+import Datasets
 
-img1 = utils.load_image("./test_data/tiger.jpeg")
-img2 = utils.load_image("./test_data/puzzle.jpeg")
 
-batch1 = img1.reshape((1, 224, 224, 3))
-batch2 = img2.reshape((1, 224, 224, 3))
+iteration = 50
+#lr = 0.0001
+batchsize = 64
 
-batch = np.concatenate((batch1, batch2), 0)
+#print_interval = 10 #每10个输出结果
+#num_steps = 1000     #每100保存模型
 
-# with tf.Session(config=tf.ConfigProto(gpu_options=(tf.GPUOptions(per_process_gpu_memory_fraction=0.7)))) as sess:
-with tf.device('/cpu:0'):
-    with tf.Session() as sess:
-        images = tf.placeholder("float", [2, 224, 224, 3])
-        train_mode = tf.placeholder(tf.bool)
-        feed_dict = {images: batch, train_mode: False}
+#with tf.device('/gpu:0'):
 
-        vgg = vgg16.Vgg16('./vgg16.npy')
-        vgg.build(images,train_mode)
-        
-        #添加了该句
-        sess.run(tf.global_variables_initializer())
+saver = tf.train.Saver()
+with tf.Session() as sess:
+    images = tf.placeholder("float", [batchsize, 224, 224, 3])
+    gt = tf.placeholder("float", [batchsize, 25])
+    
+    #添加了该句
+    dataset = Datasets.dataset('./test_label.txt')
 
-        prob = sess.run(vgg.prob, feed_dict=feed_dict)
-        print(prob)
-        utils.print_prob(prob[0], './synset.txt')
-        utils.print_prob(prob[1], './synset.txt')
+    saver.restore(sess,'./model/mymodel.ckpt')
+    prob_net = tf.get_default_graph().get_tensor_by_name('prob:0')
+    loss_net = tf.get_default_graph().get_tensor_by_name('loss:0')
+    acc_net = tf.get_default_graph().get_tensor_by_name('acc:0')
+
+    for iter in range(iteration):
+        batch,labels = dataset.getbatch(batchsize)
+        feed_dict = {images: batch,gt:labels,train_mode: True}
+        prob1,loss,acc= sess.run([prob_net,loss_net ,acc_net], feed_dict=feed_dict)
+            
+     
+        print("iter:  ",iter+1,",   loss: ",loss, ",   acc: ",acc)
+        utils.print_prob(prob1,'./synset.txt')
+
